@@ -1,4 +1,4 @@
-package com.persistent.userauthentication.util;
+package com.persistent.userauthentication.util.basicauth;
 
 import com.persistent.userauthentication.model.AuthenticationRequest;
 import com.persistent.userauthentication.service.AuthService;
@@ -50,21 +50,21 @@ public class JwtUtil {
         return extractExpiration(token, id).before(new Date());
     }
 
-    private String createToken(Map<String, Object> claims, String subject) {
+    private String createToken(Map<String, Object> claims, String subject, int lifeTime) {
         AuthenticationRequest user = authService.getUserByUsername(subject); //subject is => userDetails.getUsername()
         String SECRET_KEY = user.getSecret();
         long id = user.getId();
 
         String jwt = Jwts.builder().setClaims(claims).setSubject(subject).setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 10))
-                .signWith(SignatureAlgorithm.HS256, SECRET_KEY).compact();
+                .setExpiration(new Date(System.currentTimeMillis() + 1000 * lifeTime)) //1000 * 60 * 60 * 10
+                .signWith(SignatureAlgorithm.RS256, SECRET_KEY).compact(); //HS256
 
-        return jwt+"$"+id; //concatinate jwt with user id
+        return jwt+"$"+id; //concatenate jwt with user id
     }
 
-    public String generateToken(UserDetails userDetails) {
+    public String generateToken(UserDetails userDetails, int lifeTime) {
         Map<String, Object> claims = new HashMap<>();
-        return createToken(claims, userDetails.getUsername());
+        return createToken(claims, userDetails.getUsername(), lifeTime);
     }
 
 
@@ -73,7 +73,7 @@ public class JwtUtil {
         return (username.equals(userDetails.getUsername()) && !isTokenExpired(token, id));
     }
 
-    public String extendToken(String token) {
+    public String extendToken(String token, int lifeTime) {
         String jwt = token.substring(7);
         Long id = Long.parseLong(jwt.substring(jwt.lastIndexOf("$") + 1)); //extract id from jwt
         jwt = jwt.substring(0, jwt.indexOf("$")); //remove id from jwt
@@ -81,7 +81,7 @@ public class JwtUtil {
         String userName = extractUsername(jwt, id);
 
         Map<String, Object> claims = new HashMap<>();
-        return createToken(claims, userName);
+        return createToken(claims, userName, lifeTime);
     }
 
     public static String generateRandomSecret(int len, int randNumOrigin, int randNumBound) {

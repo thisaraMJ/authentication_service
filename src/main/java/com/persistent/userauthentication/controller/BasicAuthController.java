@@ -3,8 +3,9 @@ package com.persistent.userauthentication.controller;
 import com.persistent.userauthentication.model.AuthenticationRequest;
 import com.persistent.userauthentication.model.AuthenticationResponse;
 import com.persistent.userauthentication.service.AuthService;
-import com.persistent.userauthentication.util.JwtUtil;
+import com.persistent.userauthentication.util.basicauth.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -12,8 +13,12 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @RestController
-public class AuthController {
+@RequestMapping("/jwt")
+public class BasicAuthController {
 
     @Autowired
     private AuthenticationManager authenticationManager;
@@ -24,45 +29,50 @@ public class AuthController {
     @Autowired
     private JwtUtil jwtTokenUtil;
 
-    @RequestMapping(value = "/jwt/hello", method = RequestMethod.GET)
+    @Value("${access.token.life.time}")
+    private Integer accessTokenLifeTime;
+
+    @Value("${refresh.token.life.time}")
+    private Integer refreshTokenLifeTime;
+
+    @RequestMapping(value = "/hello", method = RequestMethod.GET)
     public String Hello(){
-        return "jwt auhentication successfull";
+        return "jwt authentication successful!";
     }
 
-    @RequestMapping(value = "/ldapauth/hello", method = RequestMethod.GET)
-    public String LdapAuth(){
-        return "ldap authentication successful!";
-    }
-
-    @RequestMapping(value = "/googleauth/hello", method = RequestMethod.GET)
-    public String GooglAauth(){
-        return "google authentication successful!";
-    }
-
-    @RequestMapping(value = "/jwt/authenticate", method = RequestMethod.POST)
+    @RequestMapping(value = "/auth-server", method = RequestMethod.POST)
     public ResponseEntity<?> createAuthenticationToken(@RequestBody AuthenticationRequest authenticationRequest) throws Exception {
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(authenticationRequest.getUsername(), authenticationRequest.getPassword())
             );
         }catch (BadCredentialsException e){
-            throw new Exception("username or password is incorrect!", e);
+            throw new Exception("Username or password is incorrect!", e);
         }
 
         final UserDetails userDetails = authService.loadUserByUsername(authenticationRequest.getUsername());
 
-        final String jwt = jwtTokenUtil.generateToken(userDetails);
+        AuthenticationResponse accessToken = new AuthenticationResponse(jwtTokenUtil.generateToken(userDetails,accessTokenLifeTime));
+        AuthenticationResponse refreshToken = new AuthenticationResponse(jwtTokenUtil.generateToken(userDetails,refreshTokenLifeTime));
 
-        return ResponseEntity.ok(new AuthenticationResponse(jwt));
+        Map<String, AuthenticationResponse> tokens = new HashMap<>();
+        tokens.put("access_token", accessToken);
+        tokens.put("refresh_token", refreshToken);
+
+        return ResponseEntity.ok(tokens);
     }
 
-    @RequestMapping(value = "/jwt/extendtoken", method = RequestMethod.POST)
+    @RequestMapping(value = "/extend-token", method = RequestMethod.POST)
     public ResponseEntity<?> createNewAuthenticationToken(@RequestHeader("Authorization") String token) throws Exception {
-        final String jwt = jwtTokenUtil.extendToken(token);
-        return ResponseEntity.ok(new AuthenticationResponse(jwt));
+        AuthenticationResponse accessToken = new AuthenticationResponse(jwtTokenUtil.extendToken(token, accessTokenLifeTime));
+
+        Map<String, AuthenticationResponse> tokens = new HashMap<>();
+        tokens.put("access_token", accessToken);
+
+        return ResponseEntity.ok(tokens);
     }
 
-    @RequestMapping(value = "/jwt/invalidate", method = RequestMethod.POST)
+    @RequestMapping(value = "/invalidate", method = RequestMethod.POST)
     public ResponseEntity<?> invalidateAuthenticationToken(@RequestHeader("Authorization") String token) throws Exception {
         jwtTokenUtil.invalidateToken(token);
         return ResponseEntity.ok("Invalidation Successful!");

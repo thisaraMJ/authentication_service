@@ -29,7 +29,6 @@ public class AuthService implements UserDetailsService {
     public UserDetails loadUserByUsername(String userName) throws UsernameNotFoundException {
         AuthenticationRequest user = authRepository.findByUsername(userName);
         return new User( user.getUsername(), user.getPassword(), new ArrayList<>());
-//        return new User("username","password", new ArrayList<>());
     }
 
     public AuthenticationRequest getUserByUsername(String userName){
